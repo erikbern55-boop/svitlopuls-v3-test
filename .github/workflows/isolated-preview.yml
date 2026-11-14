@@ -41,29 +41,42 @@ jobs:
           s=p.read_text()
           banner='<div style="position:sticky;top:0;z-index:9999;padding:12px;background:#6d3300;color:white;font:700 17px Arial;text-align:center">ТЕСТОВА КАРТКА · ДЕМО-ДАНІ 07.11.2026 · ЖИВИЙ ДТЕК НЕ ПІДКЛЮЧЕНО · НЕ ДЛЯ ПЛАНУВАННЯ ВІДКЛЮЧЕНЬ</div>'
           s=s.replace('<body>', '<body>'+banner,1)
-          # Keep the approved 1404px composition; only scale the whole card.
+          # A real viewport + scale wrapper, not CSS zoom (unreliable in Android in-app browsers).
+          s=s.replace('<head>', '<head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">', 1)
           responsive = """<style>
-          html,body{width:100%!important;min-width:0!important;overflow-x:auto!important;margin:0!important}
-          .v3{width:1404px!important;max-width:none!important;transform:none!important;transform-origin:top left!important}
-          #trial-tools{position:sticky;top:0;z-index:10000;display:flex;align-items:center;justify-content:center;gap:12px;background:#082218;color:#fff;padding:8px;font:16px Arial}
-          #trial-tools button{border:1px solid #4dfd63;border-radius:8px;background:#113c27;color:white;padding:8px 14px;font:700 16px Arial}
-          #trial-tools output{min-width:56px;text-align:center}
+          html,body{width:100%!important;min-width:0!important;overflow-x:hidden!important;margin:0!important}
+          #trial-tools{position:sticky;top:0;z-index:10000;display:flex;align-items:center;justify-content:center;gap:6px;background:#082218;color:#fff;padding:7px;font:14px Arial;box-sizing:border-box;width:100%}
+          #trial-tools button{border:1px solid #4dfd63;border-radius:8px;background:#113c27;color:white;padding:7px 9px;font:700 14px Arial}
+          #trial-tools output{min-width:45px;text-align:center}
+          #trial-frame{width:100%;position:relative;overflow:visible}
+          #trial-card{width:1404px;transform-origin:top left}
+          #trial-card .v3{width:1404px!important;max-width:none!important;zoom:1!important;transform:none!important}
           </style>"""
           s=s.replace('</head>',responsive+'</head>',1)
           tools='<div id="trial-tools"><button type="button" id="trial-minus" aria-label="Зменшити масштаб">−</button><button type="button" id="trial-fit">За шириною</button><button type="button" id="trial-plus" aria-label="Збільшити масштаб">+</button><output id="trial-scale"></output></div>'
-          s=s.replace('</body>',tools+"""<script>
+          s=s.replace('<body>', '<body>'+tools+'<div id="trial-frame"><div id="trial-card">',1)
+          s=s.replace('</body>', '</div></div>'+"""<script>
           (function(){
-            const card=document.querySelector('.v3');
-            if(!card)return;
+            const frame=document.getElementById('trial-frame');
+            const card=document.getElementById('trial-card');
             const label=document.getElementById('trial-scale');
             let scale=1,manual=false;
-            function apply(v){scale=Math.max(.2,Math.min(1.5,v));card.style.zoom=String(scale);label.textContent=Math.round(scale*100)+'%';}
-            function fit(){manual=false;apply(Math.min(1,document.documentElement.clientWidth/1404));}
+            function apply(v){
+              scale=Math.max(.15,Math.min(2,v));
+              card.style.transform='scale('+scale+')';
+              frame.style.height=Math.ceil(card.scrollHeight*scale)+'px';
+              frame.style.width=Math.ceil(1404*scale)+'px';
+              document.body.style.overflowX=(1404*scale>window.innerWidth+1)?'auto':'hidden';
+              document.documentElement.style.overflowX=(1404*scale>window.innerWidth+1)?'auto':'hidden';
+              label.textContent=Math.round(scale*100)+'%';
+            }
+            function fit(){manual=false;apply(Math.min(1,(window.innerWidth||document.documentElement.clientWidth)/1404));}
             document.getElementById('trial-minus').addEventListener('click',()=>{manual=true;apply(scale-.1);});
             document.getElementById('trial-plus').addEventListener('click',()=>{manual=true;apply(scale+.1);});
             document.getElementById('trial-fit').addEventListener('click',fit);
-            window.addEventListener('resize',()=>{if(!manual)fit();});
+            window.addEventListener('resize',()=>{if(!manual)fit();else apply(scale);});
             fit();
+            setTimeout(fit,200);
           })();
           </script></body>""",1)
           p.write_text(s)
