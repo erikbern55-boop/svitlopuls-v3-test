@@ -114,13 +114,13 @@ html=html.replace('</body>',`</div></div><script>
 (function(){
 const el=document.getElementById('trial-card'),out=document.getElementById('percent'),shell=document.getElementById('trial-shell');let scale=1;
 function apply(n){scale=Math.max(.2,Math.min(2,n));el.style.transform='scale('+scale+')';shell.style.height=Math.ceil(el.scrollHeight*scale)+'px';el.parentElement.style.width=Math.ceil(1404*scale)+'px';out.textContent=' '+Math.round(scale*100)+'%';}
-function fit(){apply(Math.min(1,innerWidth/1404));}
+function fit(){apply(Math.min(1,innerWidth/1404));}\nfunction readable(){apply(Math.max(.65,Math.min(1,innerWidth/1404)));}
 document.getElementById('minus').onclick=()=>apply(scale-.1);
 document.getElementById('plus').onclick=()=>apply(scale+.1);
-document.getElementById('fit').onclick=fit;fit();
+document.getElementById('fit').onclick=fit;\nconst readableBtn=document.createElement('button');readableBtn.textContent='Читабельний режим';readableBtn.id='readable';document.getElementById('trial-tools').appendChild(readableBtn);readableBtn.onclick=readable;\nreadable();
 const production=${production};
 const generated=Date.parse('${generatedAt}');
-const clockEl=document.querySelector('.v3-clock');
+const clockEl=document.querySelector('.v3-clock');\nif(clockEl&&window.__trialSchedule?.date){clockEl.setAttribute('aria-live','polite');}
 const headingEl=document.querySelector('.v3-count-event');
 const detailEl=document.querySelector('.v3-next');
 const footer=document.querySelector('.v3-footer');
