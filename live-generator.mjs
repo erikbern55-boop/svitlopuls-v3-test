@@ -138,11 +138,11 @@ html=html.replace(warning,warning+'<div id="trial-tools" style="position:sticky;
 html=html.replace('</body>',`</div></div><script>
 (function(){
 const el=document.getElementById('trial-card'),out=document.getElementById('percent'),shell=document.getElementById('trial-shell');let scale=1;
-function apply(n){scale=Math.max(.2,Math.min(2,n));el.style.transform='scale('+scale+')';shell.style.height=Math.ceil(el.scrollHeight*scale)+'px';el.parentElement.style.width=Math.ceil(1404*scale)+'px';out.textContent=' '+Math.round(scale*100)+'%';}
-function fit(){apply(Math.min(1,innerWidth/1404));}\nfunction readable(){apply(Math.max(.65,Math.min(1,innerWidth/1404)));}
+function apply(n){scale=Math.max(.2,Math.min(2,n));el.style.transform='scale('+scale+')';shell.style.height=Math.ceil(el.scrollHeight*scale)+'px';el.parentElement.style.width=Math.ceil(1404*scale)+'px';shell.style.overflowX='auto';shell.style.overflowY='visible';shell.style.touchAction='pan-x pan-y';out.textContent=' '+Math.round(scale*100)+'%';}
+function fit(){apply(Math.min(1,Math.max(.2,(shell.clientWidth||innerWidth)/1404)));shell.scrollLeft=0;}\nfunction readable(){apply(Math.max(.65,Math.min(1,innerWidth/1404)));}
 document.getElementById('minus').onclick=()=>apply(scale-.1);
 document.getElementById('plus').onclick=()=>apply(scale+.1);
-document.getElementById('fit').onclick=fit;\nconst readableBtn=document.createElement('button');readableBtn.textContent='Читабельний режим';readableBtn.id='readable';document.getElementById('trial-tools').appendChild(readableBtn);readableBtn.onclick=readable;\nreadable();
+document.getElementById('fit').onclick=fit;\nconst readableBtn=document.createElement('button');readableBtn.textContent='Читабельний режим';readableBtn.id='readable';document.getElementById('trial-tools').appendChild(readableBtn);readableBtn.onclick=readable;\nfit();
 const production=${production};
 const generated=Date.parse('${generatedAt}');
 const clockEl=document.querySelector('.v3-clock');\nif(clockEl&&window.__trialSchedule?.date){clockEl.setAttribute('aria-live','polite');}
@@ -167,13 +167,29 @@ function tickLive(){
  const toMin=(t)=>{const m=/^([0-9]{2}):([0-9]{2})$/.exec(t||'');return m?Number(m[1])*60+Number(m[2]):NaN};
  const periods=data.periods;
  const next=periods.find((p,i)=>i>0&&toMin(p.begin)>nowMin&&p.power!==periods[i-1].power);
- if(!next){clockEl.textContent='00:00';if(headingEl)headingEl.textContent='До кінця доби змін немає';if(detailEl)detailEl.textContent='Наступні перемикання перевіряй у графіку на завтра';return;}
+ if(!next){
+  const tomorrow=data.tomorrow;
+  const tomorrowPeriods=tomorrow?.periods;
+  if(tomorrow?.date&&Array.isArray(tomorrowPeriods)&&tomorrowPeriods.length){
+   const current=periods.at(-1)?.power;
+   const midnight=tomorrowPeriods[0]?.power!==current;
+   const first=midnight?{begin:'00:00',power:tomorrowPeriods[0].power}:tomorrowPeriods.find((p,i)=>i>0&&p.power!==tomorrowPeriods[i-1].power);
+   if(first){
+    const remaining=Math.max(0,Math.ceil(1440-nowMin+toMin(first.begin)));
+    clockEl.textContent=String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0');
+    if(headingEl)headingEl.textContent=first.power?'До наступного ввімкнення':'До наступного вимкнення';
+    if(detailEl)detailEl.textContent='Завтра '+first.begin+' · Київ · за графіком ДТЕК';
+    return;
+   }
+  }
+  clockEl.textContent='—:—';if(headingEl)headingEl.textContent='Наступну подію не визначено';if(detailEl)detailEl.textContent='Перевір графік ДТЕК на завтра';return;
+ }
  const remaining=Math.max(0,Math.ceil(toMin(next.begin)-nowMin));
  clockEl.textContent=String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0');
  if(headingEl)headingEl.textContent=next.power?'До планового ввімкнення':'До планового вимкнення';
  if(detailEl)detailEl.textContent='Очікувана подія: '+next.begin+' · Київ · JSON: '+fmtKyiv(new Date(generated));
 }
-window.__trialSchedule=${JSON.stringify({date,live:result.live,periods:result.periods})};
+window.__trialSchedule=${JSON.stringify({date,live:result.live,periods:result.periods,tomorrow:{date:tomorrow,periods:daySchedules.tomorrow??null}})};
 tickLive();setInterval(tickLive,1000);
 setInterval(()=>{if(Date.now()-generated>12*60*1000&&!production){document.getElementById('trial-status').textContent='⚠️ ТЕСТ: дані застаріли — перевірте оновлення GitHub Actions';}},30000);
 setInterval(async()=>{try{const r=await fetch('svitlopuls-live.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();if(j.generatedAt!=='${generatedAt}')location.reload();}catch(e){}},60000);
