@@ -97,6 +97,7 @@ for(const item of daysToRender){
 fs.writeFileSync('dist/dtek-interval-audit.json',JSON.stringify(audit,null,2));
 console.log('DTEK INDEPENDENT SLOT AUDIT:',JSON.stringify(Object.fromEntries(Object.entries(audit.days).map(([day,v])=>[day,{date:v.date,ok:v.ok,checkedHalfHours:v.checkedHalfHours,mismatches:v.mismatches?.length}]))));
 fs.writeFileSync('dist/svitlopuls-live.json',JSON.stringify(result,null,2));
+function neutralCalendar(markup){return markup.replace('📅 ', '<span class="v3-calendar-icon" aria-hidden="true">▦</span> ');}
 function clarifyCountdown(markup,periods,dayLabel){
  const replaceText=(html,klass,value)=>{
   const startToken='<div class="'+klass+'"';
@@ -125,7 +126,7 @@ function clarifyCountdown(markup,periods,dayLabel){
 const details={schedule:result.periods,date,label:'сьогодні',update:result.sourceUpdated??'',source:result.source??'НЕМАЄ АКТУАЛЬНИХ ДАНИХ',now,weather:result.weather};
 let html='';
 if(result.live){
-  html=clarifyCountdown(buildCardV3Html(details),result.periods,'сьогодні');
+  html=neutralCalendar(clarifyCountdown(buildCardV3Html(details),result.periods,'сьогодні'));
 }else{
   // Never render the old demo schedule as today's DTEK data.
   html='<html lang="uk"><head><meta charset="utf-8"></head><body style="background:#04140b;color:white;font:22px Arial;padding:28px"><h1>Світлопульс 3.0 — тест</h1><p>Актуальний графік ДТЕК недоступний. Дані не відображаються, щоб уникнути помилкових відключень.</p></body></html>';
@@ -215,7 +216,7 @@ try{
   const periods=daySchedules[item.slug];
   if(!periods){pngChecks.days[item.slug]={date:item.date,ok:false,error:'DTEK has not published this day'};continue;}
   const dayWeather=item.slug==='today'?result.weather:(result.weather?weatherForDate(await loadWeather({now}),item.date,now):null);
-  let markup=clarifyCountdown(buildCardV3Html({schedule:periods,date:item.date,label:item.label,source:result.source,update:result.sourceUpdated??'',weather:dayWeather,now}),periods,item.label);
+  let markup=neutralCalendar(clarifyCountdown(buildCardV3Html({schedule:periods,date:item.date,label:item.label,source:result.source,update:result.sourceUpdated??'',weather:dayWeather,now}),periods,item.label));
   markup=markup.split('https://commons.wikimedia.org/wiki/Special:FilePath/Garlic_Bulbs_(Unsplash).jpg?width=500').join('https://svitlopuls-test.invalid/svitlopuls_etalon_garlic.png');
   markup=markup.replace(/<div class="wx-moon-icon"><svg[\s\S]*?<\/svg><\/div>/,'<div class="wx-moon-icon"><img src="https://svitlopuls-test.invalid/svitlopuls_etalon_moon.png" alt="Місяць з еталона"/></div>');
   const page=await browser.newPage({viewport:{width:1404,height:900},deviceScaleFactor:1});
