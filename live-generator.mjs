@@ -69,6 +69,36 @@ document.getElementById('minus').onclick=()=>apply(scale-.1);
 document.getElementById('plus').onclick=()=>apply(scale+.1);
 document.getElementById('fit').onclick=fit;fit();
 const generated=Date.parse('${generatedAt}');
+const clockEl=document.querySelector('.v3-clock');
+const headingEl=document.querySelector('.v3-count-event');
+const detailEl=document.querySelector('.v3-next');
+const footer=document.querySelector('.v3-footer');
+const freshness=document.createElement('span');
+freshness.id='trial-data-freshness';
+if(footer)footer.appendChild(freshness);
+const kyivParts=(date)=>Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Kyiv',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(date).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+const fmtKyiv=(date)=>new Intl.DateTimeFormat('uk-UA',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date);
+function tickLive(){
+ const age=Date.now()-generated;
+ const stale=!Number.isFinite(generated)||age>12*60000;
+ freshness.textContent=Number.isFinite(generated)?' · JSON сформовано: '+fmtKyiv(new Date(generated))+' (Київ)'+(stale?' · ⚠️ Дані застаріли':''):' · ⚠️ Час оновлення невідомий';
+ if(stale){document.getElementById('trial-status').textContent='⚠️ ТЕСТ: дані застаріли · останнє оновлення '+(Number.isFinite(generated)?fmtKyiv(new Date(generated)):'невідоме')+' (Київ)';}
+ if(!clockEl)return;
+ const data=window.__trialSchedule;
+ if(!data||!data.live||!Array.isArray(data.periods)||data.date!==[kyivParts(new Date()).year,kyivParts(new Date()).month,kyivParts(new Date()).day].join('-')||stale){clockEl.textContent='—:—';if(headingEl)headingEl.textContent='Актуальний графік недоступний';return;}
+ const k=kyivParts(new Date());
+ const nowMin=Number(k.hour)*60+Number(k.minute)+Number(k.second)/60;
+ const toMin=(t)=>{const m=/^(\\d{2}):(\\d{2})$/.exec(t||'');return m?Number(m[1])*60+Number(m[2]):NaN};
+ const periods=data.periods;
+ const next=periods.find((p,i)=>i>0&&toMin(p.begin)>nowMin&&p.power!==periods[i-1].power);
+ if(!next){clockEl.textContent='—:—';if(headingEl)headingEl.textContent='До кінця доби змін немає';return;}
+ const remaining=Math.max(0,Math.ceil(toMin(next.begin)-nowMin));
+ clockEl.textContent=String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0');
+ if(headingEl)headingEl.textContent=next.power?'До планового ввімкнення':'До планового вимкнення';
+ if(detailEl)detailEl.textContent='Очікувана подія: '+next.begin+' · Київ · JSON: '+fmtKyiv(new Date(generated));
+}
+window.__trialSchedule=${JSON.stringify({date,live:result.live,periods:result.periods})};
+tickLive();setInterval(tickLive,1000);
 setInterval(()=>{if(Date.now()-generated>12*60*1000){document.getElementById('trial-status').textContent='⚠️ ТЕСТ: дані застаріли — перевірте оновлення GitHub Actions';}},30000);
 setInterval(async()=>{try{const r=await fetch('svitlopuls-live.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();if(j.generatedAt!=='${generatedAt}')location.reload();}catch(e){}},60000);
 })();</script></body>`);
