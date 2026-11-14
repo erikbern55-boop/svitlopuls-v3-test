@@ -10,6 +10,7 @@ const now=new Date(),date=kyivDate(now),generatedAt=now.toISOString();
 const tomorrow=new Date(Date.parse(date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
 const daysToRender=[{date,label:'сьогодні',slug:'today'},{date:tomorrow,label:'завтра',slug:'tomorrow'}];
 const daySchedules={};
+const rawDtekByDay={};
 const result={generatedAt,date,group:'1.1',live:false,source:null,error:null,periods:[],weather:null,garden:null,moon:null,astro:null};
 const pad=n=>String(n).padStart(2,'0');
 const clock=m=>pad(Math.floor(m/60))+':'+pad(m%60);
@@ -38,7 +39,11 @@ try{
   if(!day)throw Error('ДТЕК не надав графік на поточну дату');
   for(const item of daysToRender){
     const found=available.find(x=>x.date===item.date);
-    if(found)daySchedules[item.slug]=scheduleForDay(fact.data[found.key]?.GPV1_1 ?? fact.data[found.key]?.['GPV1.1']);
+    if(found){
+      const states=fact.data[found.key]?.GPV1_1 ?? fact.data[found.key]?.['GPV1.1'];
+      rawDtekByDay[item.slug]=states;
+      daySchedules[item.slug]=scheduleForDay(states);
+    }
   }
   result.periods=daySchedules.today;
   // DTEK uses GPV1.1, not a display-only "1.1" label.
@@ -65,6 +70,32 @@ try{
   result.garden={tip:gardenTip(date,result.weather),...sowingAdvice(date,result.weather,result.moon)};
 }catch(error){result.infoError=String(error.message)}
 fs.mkdirSync('dist',{recursive:true});
+// Independently audit every raw DTEK half-hour against the generated schedule.
+const audit={generatedAt,group:'1.1',source:result.source,sourceUpdated:result.sourceUpdated,days:{}};
+for(const item of daysToRender){
+ const raw=rawDtekByDay[item.slug], periods=daySchedules[item.slug];
+ if(!raw||!periods){audit.days[item.slug]={date:item.date,ok:false,error:'No raw DTEK schedule'};continue;}
+ const mismatches=[];
+ const rawStates=[];
+ for(let h=0;h<24;h++){
+  const v=raw[h+1]??raw[String(h+1)];
+  if(!['yes','no','first','second'].includes(v))throw Error('Invalid raw DTEK state '+h);
+  rawStates.push(v);
+  const expected=v==='yes'?[true,true]:v==='no'?[false,false]:v==='first'?[false,true]:[true,false];
+  for(let half=0;half<2;half++){
+   const start=h*60+half*30;
+   const matched=periods.filter(p=>{
+    const parse=t=>Number(t.slice(0,2))*60+Number(t.slice(3));
+    return parse(p.begin)<=start&&parse(p.end)>=start+30;
+   });
+   if(matched.length!==1||matched[0].power!==expected[half])mismatches.push({hour:h+1,half:half+1,raw:v,expected:expected[half],rendered:matched.map(p=>p.power)});
+  }
+ }
+ audit.days[item.slug]={date:item.date,ok:mismatches.length===0,rawHourlyStates:rawStates,periods,checkedHalfHours:48,mismatches};
+ if(mismatches.length)throw Error('DTEK raw-to-card mismatch: '+JSON.stringify(mismatches));
+}
+fs.writeFileSync('dist/dtek-interval-audit.json',JSON.stringify(audit,null,2));
+console.log('DTEK INDEPENDENT SLOT AUDIT:',JSON.stringify(Object.fromEntries(Object.entries(audit.days).map(([day,v])=>[day,{date:v.date,ok:v.ok,checkedHalfHours:v.checkedHalfHours,mismatches:v.mismatches?.length}]))));
 fs.writeFileSync('dist/svitlopuls-live.json',JSON.stringify(result,null,2));
 const details={schedule:result.periods,date,label:'сьогодні',update:result.sourceUpdated??'',source:result.source??'НЕМАЄ АКТУАЛЬНИХ ДАНИХ',now,weather:result.weather};
 let html='';
