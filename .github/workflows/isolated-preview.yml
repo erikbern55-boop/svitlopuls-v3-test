@@ -1,94 +1,65 @@
 name: Isolated V3 preview (no Telegram)
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
 permissions:
   contents: read
   pages: write
   id-token: write
 concurrency:
   group: isolated-v3-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   preview:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Fetch test branch of renderer only
+      - name: Checkout isolated test repository
+        uses: actions/checkout@v4
+      - name: Checkout renderer test branch (never production deployment)
         uses: actions/checkout@v4
         with:
           repository: erikbern55-boop/dtek-schedule
           ref: feature/svitlopuls-v3-independent-generator
+          path: renderer
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: renderer/.nvmrc
           cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - name: Generate standalone browser preview without Telegram
-        run: node test/card-v3-smoke.js
-      - name: Prepare explicitly labeled DEMO page
+          cache-dependency-path: renderer/package-lock.json
+      - name: Install renderer dependencies
+        working-directory: renderer
+        run: npm ci
+      - name: Install Chromium for DTEK official source
+        working-directory: renderer
+        run: npx playwright install --with-deps chromium
+      - name: Generate independent live JSON and card (no Telegram tokens)
+        working-directory: renderer
+        env:
+          REGION: kr
+          GROUP: '1.1'
         run: |
-          mkdir -p dist
-          cp svitlopuls-v3-fullscreen-preview.html dist/index.html
+          cp ../live-generator.mjs ./live-generator.mjs
+          node live-generator.mjs
           python3 - <<'PY'
+          import json
           from pathlib import Path
-          p=Path('dist/index.html')
-          s=p.read_text()
-          banner='<div style="position:sticky;top:0;z-index:9999;padding:12px;background:#6d3300;color:white;font:700 17px Arial;text-align:center">ТЕСТОВА КАРТКА · ДЕМО-ДАНІ 07.11.2026 · ЖИВИЙ ДТЕК НЕ ПІДКЛЮЧЕНО · НЕ ДЛЯ ПЛАНУВАННЯ ВІДКЛЮЧЕНЬ</div>'
-          s=s.replace('<body>', '<body>'+banner,1)
-          # A real viewport + scale wrapper, not CSS zoom (unreliable in Android in-app browsers).
-          s=s.replace('<head>', '<head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">', 1)
-          responsive = """<style>
-          html,body{width:100%!important;min-width:0!important;overflow-x:hidden!important;margin:0!important}
-          #trial-tools{position:sticky;top:0;z-index:10000;display:flex;align-items:center;justify-content:center;gap:6px;background:#082218;color:#fff;padding:7px;font:14px Arial;box-sizing:border-box;width:100%}
-          #trial-tools button{border:1px solid #4dfd63;border-radius:8px;background:#113c27;color:white;padding:7px 9px;font:700 14px Arial}
-          #trial-tools output{min-width:45px;text-align:center}
-          #trial-frame{width:100%;position:relative;overflow:visible}
-          #trial-card{width:1404px;transform-origin:top left}
-          #trial-card .v3{width:1404px!important;max-width:none!important;zoom:1!important;transform:none!important}
-          </style>"""
-          s=s.replace('</head>',responsive+'</head>',1)
-          tools='<div id="trial-tools"><button type="button" id="trial-minus" aria-label="Зменшити масштаб">−</button><button type="button" id="trial-fit">За шириною</button><button type="button" id="trial-plus" aria-label="Збільшити масштаб">+</button><output id="trial-scale"></output></div>'
-          s=s.replace('<body>', '<body>'+tools+'<div id="trial-frame"><div id="trial-card">',1)
-          s=s.replace('</body>', '</div></div>'+"""<script>
-          (function(){
-            const frame=document.getElementById('trial-frame');
-            const card=document.getElementById('trial-card');
-            const label=document.getElementById('trial-scale');
-            let scale=1,manual=false;
-            function apply(v){
-              scale=Math.max(.15,Math.min(2,v));
-              card.style.transform='scale('+scale+')';
-              frame.style.height=Math.ceil(card.scrollHeight*scale)+'px';
-              frame.style.width=Math.ceil(1404*scale)+'px';
-              document.body.style.overflowX=(1404*scale>window.innerWidth+1)?'auto':'hidden';
-              document.documentElement.style.overflowX=(1404*scale>window.innerWidth+1)?'auto':'hidden';
-              label.textContent=Math.round(scale*100)+'%';
-            }
-            function fit(){manual=false;apply(Math.min(1,(window.innerWidth||document.documentElement.clientWidth)/1404));}
-            document.getElementById('trial-minus').addEventListener('click',()=>{manual=true;apply(scale-.1);});
-            document.getElementById('trial-plus').addEventListener('click',()=>{manual=true;apply(scale+.1);});
-            document.getElementById('trial-fit').addEventListener('click',fit);
-            window.addEventListener('resize',()=>{if(!manual)fit();else apply(scale);});
-            fit();
-            setTimeout(fit,200);
-          })();
-          </script></body>""",1)
-          p.write_text(s)
+          d=json.loads(Path('dist/svitlopuls-live.json').read_text())
+          assert d['date'] and d['group']=='1.1'
+          assert 'generatedAt' in d and 'live' in d
+          if d['live']:
+              assert d['periods'][0]['begin']=='00:00'
+              assert d['periods'][-1]['end']=='24:00'
+          print('Test JSON:',d['date'],'live:',d['live'],'periods:',len(d['periods']))
           PY
-          printf 'User-agent: *\nDisallow: /\n' > dist/robots.txt
-      - name: Enable and configure isolated GitHub Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
-      - name: Publish to isolated GitHub Pages
-        id: deployment
+          path: renderer/dist
+      - id: deployment
         uses: actions/deploy-pages@v4
