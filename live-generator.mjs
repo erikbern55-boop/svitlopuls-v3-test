@@ -152,7 +152,7 @@ try{
    await route.fulfill({status:200,contentType:'image/png',body:fs.readFileSync(filename)});
   });
   await page.setContent(markup,{waitUntil:'load'});
-  await page.locator('.wx-garden-art img').evaluate(async img=>{await img.decode();if(!img.naturalWidth)throw Error('Garlic missing')});
+  await page.locator('.weather-garden .wx-garden-art img').evaluate(async img=>{await img.decode();if(!img.naturalWidth)throw Error('Garlic missing')});
   await page.locator('.wx-moon-icon img').evaluate(async img=>{await img.decode();if(!img.naturalWidth)throw Error('Moon missing')});
   const png=await page.screenshot({type:'png',fullPage:true});
   if(png.length<10000)throw Error('PNG too small');
