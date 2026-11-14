@@ -102,5 +102,17 @@ tickLive();setInterval(tickLive,1000);
 setInterval(()=>{if(Date.now()-generated>12*60*1000){document.getElementById('trial-status').textContent='⚠️ ТЕСТ: дані застаріли — перевірте оновлення GitHub Actions';}},30000);
 setInterval(async()=>{try{const r=await fetch('svitlopuls-live.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();if(j.generatedAt!=='${generatedAt}')location.reload();}catch(e){}},60000);
 })();</script></body>`);
+// Keep the approved reference images local to this isolated Pages deployment.
+const garlic='svitlopuls_etalon_garlic.png', moon='svitlopuls_etalon_moon.png';
+for(const name of [garlic,moon]){
+  if(!fs.existsSync(name))throw Error('Missing approved image: '+name);
+  fs.copyFileSync(name,'dist/'+name);
+}
+if(result.live){
+  html=html.replace(/https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/Garlic_Bulbs_\(Unsplash\)\.jpg\?width=500/g,garlic);
+  html=html.replace(/<div class="wx-moon-icon"><svg[\s\S]*?<\/svg><\/div>/,
+    '<div class="wx-moon-icon"><img src="'+moon+'" alt="Місяць із затвердженого еталона" width="122" height="122"/></div>');
+  if(!html.includes('src="'+garlic+'"')||!html.includes('src="'+moon+'"'))throw Error('Approved reference images not wired into HTML');
+}
 fs.writeFileSync('dist/index.html',html);
 console.log(JSON.stringify({date,live:result.live,periods:result.periods.length,weather:!!result.weather,moon:!!result.moon,error:result.error}));
