@@ -41,6 +41,31 @@ jobs:
           s=p.read_text()
           banner='<div style="position:sticky;top:0;z-index:9999;padding:12px;background:#6d3300;color:white;font:700 17px Arial;text-align:center">ТЕСТОВА КАРТКА · ДЕМО-ДАНІ 07.11.2026 · ЖИВИЙ ДТЕК НЕ ПІДКЛЮЧЕНО · НЕ ДЛЯ ПЛАНУВАННЯ ВІДКЛЮЧЕНЬ</div>'
           s=s.replace('<body>', '<body>'+banner,1)
+          # Keep the approved 1404px composition; only scale the whole card.
+          responsive = """<style>
+          html,body{width:100%!important;min-width:0!important;overflow-x:auto!important;margin:0!important}
+          .v3{width:1404px!important;max-width:none!important;transform:none!important;transform-origin:top left!important}
+          #trial-tools{position:sticky;top:0;z-index:10000;display:flex;align-items:center;justify-content:center;gap:12px;background:#082218;color:#fff;padding:8px;font:16px Arial}
+          #trial-tools button{border:1px solid #4dfd63;border-radius:8px;background:#113c27;color:white;padding:8px 14px;font:700 16px Arial}
+          #trial-tools output{min-width:56px;text-align:center}
+          </style>"""
+          s=s.replace('</head>',responsive+'</head>',1)
+          tools='<div id="trial-tools"><button type="button" id="trial-minus" aria-label="Зменшити масштаб">−</button><button type="button" id="trial-fit">За шириною</button><button type="button" id="trial-plus" aria-label="Збільшити масштаб">+</button><output id="trial-scale"></output></div>'
+          s=s.replace('</body>',tools+"""<script>
+          (function(){
+            const card=document.querySelector('.v3');
+            if(!card)return;
+            const label=document.getElementById('trial-scale');
+            let scale=1,manual=false;
+            function apply(v){scale=Math.max(.2,Math.min(1.5,v));card.style.zoom=String(scale);label.textContent=Math.round(scale*100)+'%';}
+            function fit(){manual=false;apply(Math.min(1,document.documentElement.clientWidth/1404));}
+            document.getElementById('trial-minus').addEventListener('click',()=>{manual=true;apply(scale-.1);});
+            document.getElementById('trial-plus').addEventListener('click',()=>{manual=true;apply(scale+.1);});
+            document.getElementById('trial-fit').addEventListener('click',fit);
+            window.addEventListener('resize',()=>{if(!manual)fit();});
+            fit();
+          })();
+          </script></body>""",1)
           p.write_text(s)
           PY
           printf 'User-agent: *\nDisallow: /\n' > dist/robots.txt
