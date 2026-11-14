@@ -79,7 +79,7 @@ function fit(){apply(Math.min(1,innerWidth/1404));}
 document.getElementById('minus').onclick=()=>apply(scale-.1);
 document.getElementById('plus').onclick=()=>apply(scale+.1);
 document.getElementById('fit').onclick=fit;fit();
-const production=${'${production}'};
+const production=${production};
 const generated=Date.parse('${generatedAt}');
 const clockEl=document.querySelector('.v3-clock');
 const headingEl=document.querySelector('.v3-count-event');
