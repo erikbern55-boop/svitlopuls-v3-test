@@ -46,6 +46,8 @@ jobs:
         run: |
           cp ../live-generator.mjs ./live-generator.mjs
           node live-generator.mjs
+          cp ../verify-live.mjs ./verify-live.mjs
+          node verify-live.mjs
           python3 - <<'PY'
           import json
           from pathlib import Path
