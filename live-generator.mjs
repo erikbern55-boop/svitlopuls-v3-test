@@ -144,8 +144,8 @@ try{
   if(!periods){pngChecks.days[item.slug]={date:item.date,ok:false,error:'DTEK has not published this day'};continue;}
   const dayWeather=item.slug==='today'?result.weather:(result.weather?weatherForDate(await loadWeather({now}),item.date,now):null);
   let markup=buildCardV3Html({schedule:periods,date:item.date,label:item.label,source:result.source,update:result.sourceUpdated??'',weather:dayWeather,now});
-  markup=markup.split('https://commons.wikimedia.org/wiki/Special:FilePath/Garlic_Bulbs_(Unsplash).jpg?width=500').join('svitlopuls_etalon_garlic.png');
-  markup=markup.replace(/<div class="wx-moon-icon"><svg[\s\S]*?<\/svg><\/div>/,'<div class="wx-moon-icon"><img src="svitlopuls_etalon_moon.png" alt="Місяць з еталона"/></div>');
+  markup=markup.split('https://commons.wikimedia.org/wiki/Special:FilePath/Garlic_Bulbs_(Unsplash).jpg?width=500').join('https://svitlopuls-test.invalid/svitlopuls_etalon_garlic.png');
+  markup=markup.replace(/<div class="wx-moon-icon"><svg[\s\S]*?<\/svg><\/div>/,'<div class="wx-moon-icon"><img src="https://svitlopuls-test.invalid/svitlopuls_etalon_moon.png" alt="Місяць з еталона"/></div>');
   const page=await browser.newPage({viewport:{width:1404,height:900},deviceScaleFactor:1});
   await page.route('**/svitlopuls_etalon_*.png',async route=>{
    const filename=route.request().url().includes('garlic')?'svitlopuls_etalon_garlic.png':'svitlopuls_etalon_moon.png';
