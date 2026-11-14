@@ -66,7 +66,8 @@ if(result.live){
   // Never render the old demo schedule as today's DTEK data.
   html='<html lang="uk"><head><meta charset="utf-8"></head><body style="background:#04140b;color:white;font:22px Arial;padding:28px"><h1>Світлопульс 3.0 — тест</h1><p>Актуальний графік ДТЕК недоступний. Дані не відображаються, щоб уникнути помилкових відключень.</p></body></html>';
 }
-const warning='<div id="trial-status" style="background:#4d170d;color:white;text-align:center;padding:9px;font:700 16px Arial">ТЕСТОВА КАРТКА · '+(result.live?'ДТЕК: '+result.source:'ГРАФІК НЕДОСТУПНИЙ')+' · Telegram не змінюється</div>';
+const production=process.env.PRODUCTION_VIEWER==='1';
+const warning='<div id="trial-status" style="'+(production?'display:none;':'background:#4d170d;color:white;text-align:center;padding:9px;font:700 16px Arial')+'">'+(production?'':('ТЕСТОВА КАРТКА · '+(result.live?'ДТЕК: '+result.source:'ГРАФІК НЕДОСТУПНИЙ')+' · Telegram не змінюється'))+'</div>';
 html=html.replace('<body>','<body>'+warning);
 html=html.replace('</head>',`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0!important;max-width:100%;overflow-x:auto!important}#trial-shell{width:100%;overflow:auto}#trial-card{width:1404px;transform-origin:top left}</style></head>`);
 html=html.replace(warning,warning+'<div id="trial-tools" style="position:sticky;top:0;background:#072319;color:white;z-index:9999;padding:8px;text-align:center"><button id="minus">−</button> <button id="fit">За шириною</button> <button id="plus">+</button> <output id="percent"></output></div><div id="trial-shell"><div id="trial-card">');
@@ -78,6 +79,7 @@ function fit(){apply(Math.min(1,innerWidth/1404));}
 document.getElementById('minus').onclick=()=>apply(scale-.1);
 document.getElementById('plus').onclick=()=>apply(scale+.1);
 document.getElementById('fit').onclick=fit;fit();
+const production=${'${production}'};
 const generated=Date.parse('${generatedAt}');
 const clockEl=document.querySelector('.v3-clock');
 const headingEl=document.querySelector('.v3-count-event');
@@ -92,7 +94,7 @@ function tickLive(){
  const age=Date.now()-generated;
  const stale=!Number.isFinite(generated)||age>12*60000;
  freshness.textContent=Number.isFinite(generated)?' · JSON сформовано: '+fmtKyiv(new Date(generated))+' (Київ)'+(stale?' · ⚠️ Дані застаріли':''):' · ⚠️ Час оновлення невідомий';
- if(stale){document.getElementById('trial-status').textContent='⚠️ ТЕСТ: дані застаріли · останнє оновлення '+(Number.isFinite(generated)?fmtKyiv(new Date(generated)):'невідоме')+' (Київ)';}
+ if(stale&&!production){document.getElementById('trial-status').textContent='⚠️ ТЕСТ: дані застаріли · останнє оновлення '+(Number.isFinite(generated)?fmtKyiv(new Date(generated)):'невідоме')+' (Київ)';}
  if(!clockEl)return;
  const data=window.__trialSchedule;
  if(!data||!data.live||!Array.isArray(data.periods)||data.date!==[kyivParts(new Date()).year,kyivParts(new Date()).month,kyivParts(new Date()).day].join('-')||stale){clockEl.textContent='—:—';if(headingEl)headingEl.textContent='Актуальний графік недоступний';return;}
@@ -101,7 +103,7 @@ function tickLive(){
  const toMin=(t)=>{const m=/^([0-9]{2}):([0-9]{2})$/.exec(t||'');return m?Number(m[1])*60+Number(m[2]):NaN};
  const periods=data.periods;
  const next=periods.find((p,i)=>i>0&&toMin(p.begin)>nowMin&&p.power!==periods[i-1].power);
- if(!next){clockEl.textContent='—:—';if(headingEl)headingEl.textContent='До кінця доби змін немає';return;}
+ if(!next){clockEl.textContent='00:00';if(headingEl)headingEl.textContent='До кінця доби змін немає';if(detailEl)detailEl.textContent='Наступні перемикання перевіряй у графіку на завтра';return;}
  const remaining=Math.max(0,Math.ceil(toMin(next.begin)-nowMin));
  clockEl.textContent=String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0');
  if(headingEl)headingEl.textContent=next.power?'До планового ввімкнення':'До планового вимкнення';
@@ -109,7 +111,7 @@ function tickLive(){
 }
 window.__trialSchedule=${JSON.stringify({date,live:result.live,periods:result.periods})};
 tickLive();setInterval(tickLive,1000);
-setInterval(()=>{if(Date.now()-generated>12*60*1000){document.getElementById('trial-status').textContent='⚠️ ТЕСТ: дані застаріли — перевірте оновлення GitHub Actions';}},30000);
+setInterval(()=>{if(Date.now()-generated>12*60*1000&&!production){document.getElementById('trial-status').textContent='⚠️ ТЕСТ: дані застаріли — перевірте оновлення GitHub Actions';}},30000);
 setInterval(async()=>{try{const r=await fetch('svitlopuls-live.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();if(j.generatedAt!=='${generatedAt}')location.reload();}catch(e){}},60000);
 })();</script></body>`);
 // Keep the approved reference images local to this isolated Pages deployment.
