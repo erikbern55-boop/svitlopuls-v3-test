@@ -1,5 +1,11 @@
 name: Isolated V3 preview (no Telegram)
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'live-generator.mjs'
+      - 'verify-live.mjs'
+      - '.github/workflows/isolated-preview.yml'
   workflow_dispatch:
   schedule:
     - cron: '2-59/5 * * * *'
