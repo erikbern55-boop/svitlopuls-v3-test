@@ -36,11 +36,21 @@ try{
   // DTEK uses GPV1.1, not a display-only "1.1" label.
   result.source=source;result.live=true;result.sourceUpdated=String(fact.update??'');
 }catch(error){result.error=String(error.message);console.error('LIVE DTEK unavailable:',result.error)}
-try{
-  const snapshot=await loadWeather({now});
-  result.weather=weatherForDate(snapshot,date,now);
-  if(!result.weather||result.weather.stale)throw Error('Прогноз погоди застарів');
-}catch(error){result.weather=null;result.weatherError=String(error.message)}
+// Weather is independent of DTEK: retry transient Open-Meteo failures.
+for(let attempt=1;attempt<=3;attempt++){
+  try{
+    const snapshot=await loadWeather({now});
+    result.weather=weatherForDate(snapshot,date,now);
+    if(!result.weather||result.weather.stale)throw Error('Прогноз погоди недоступний або застарів');
+    delete result.weatherError;
+    break;
+  }catch(error){
+    result.weather=null;
+    result.weatherError='Спроба '+attempt+'/3: '+String(error.message);
+    console.warn('WEATHER:',result.weatherError);
+    if(attempt<3)await new Promise(resolve=>setTimeout(resolve,attempt*2500));
+  }
+}
 try{
   result.moon=lunarForDate(date);
   result.astro=astroForMoon(result.moon,date);
