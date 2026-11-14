@@ -7,6 +7,9 @@ import {lunarForDate} from './src/moon.js';
 import {astroForMoon} from './src/astro.js';
 import {buildCardV3Html} from './src/card-v3.js';
 const now=new Date(),date=kyivDate(now),generatedAt=now.toISOString();
+const tomorrow=new Date(Date.parse(date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
+const daysToRender=[{date,label:'сьогодні',slug:'today'},{date:tomorrow,label:'завтра',slug:'tomorrow'}];
+const daySchedules={};
 const result={generatedAt,date,group:'1.1',live:false,source:null,error:null,periods:[],weather:null,garden:null,moon:null,astro:null};
 const pad=n=>String(n).padStart(2,'0');
 const clock=m=>pad(Math.floor(m/60))+':'+pad(m%60);
@@ -30,9 +33,14 @@ function scheduleForDay(states){
 }
 try{
   const {fact,source}=await getShutdownsData();
-  const day=selectScheduleDays(fact,now).find(x=>x.date===date);
+  const available=selectScheduleDays(fact,now);
+  const day=available.find(x=>x.date===date);
   if(!day)throw Error('ДТЕК не надав графік на поточну дату');
-  result.periods=scheduleForDay(fact.data[day.key]?.GPV1_1 ?? fact.data[day.key]?.['GPV1.1']);
+  for(const item of daysToRender){
+    const found=available.find(x=>x.date===item.date);
+    if(found)daySchedules[item.slug]=scheduleForDay(fact.data[found.key]?.GPV1_1 ?? fact.data[found.key]?.['GPV1.1']);
+  }
+  result.periods=daySchedules.today;
   // DTEK uses GPV1.1, not a display-only "1.1" label.
   result.source=source;result.live=true;result.sourceUpdated=String(fact.update??'');
 }catch(error){result.error=String(error.message);console.error('LIVE DTEK unavailable:',result.error)}
@@ -126,5 +134,36 @@ if(result.live){
     '<div class="wx-moon-icon"><img src="'+moon+'" alt="Місяць із затвердженого еталона" width="122" height="122"/></div>');
   if(!html.includes('src="'+garlic+'"')||!html.includes('src="'+moon+'"'))throw Error('Approved reference images not wired into HTML');
 }
+// Independent PNG validation: generate both real DTEK dates, never substitute demo data.
+const {chromium}=await import('playwright');
+const browser=await chromium.launch({headless:true});
+const pngChecks={generatedAt,source:result.source,days:{}};
+try{
+ for(const item of daysToRender){
+  const periods=daySchedules[item.slug];
+  if(!periods){pngChecks.days[item.slug]={date:item.date,ok:false,error:'DTEK has not published this day'};continue;}
+  const dayWeather=item.slug==='today'?result.weather:(result.weather?weatherForDate(await loadWeather({now}),item.date,now):null);
+  let markup=buildCardV3Html({schedule:periods,date:item.date,label:item.label,source:result.source,update:result.sourceUpdated??'',weather:dayWeather,now});
+  markup=markup.replace(/https:\\/\\/commons\\.wikimedia\\.org\\/wiki\\/Special:FilePath\\/Garlic_Bulbs_\\(Unsplash\\)\\.jpg\\?width=500/g,'svitlopuls_etalon_garlic.png');
+  markup=markup.replace(/<div class="wx-moon-icon"><svg[\\s\\S]*?<\\/svg><\\/div>/,'<div class="wx-moon-icon"><img src="svitlopuls_etalon_moon.png" alt="Місяць з еталона"/></div>');
+  const page=await browser.newPage({viewport:{width:1404,height:900},deviceScaleFactor:1});
+  await page.route('**/svitlopuls_etalon_*.png',async route=>{
+   const filename=route.request().url().includes('garlic')?'svitlopuls_etalon_garlic.png':'svitlopuls_etalon_moon.png';
+   await route.fulfill({status:200,contentType:'image/png',body:fs.readFileSync(filename)});
+  });
+  await page.setContent(markup,{waitUntil:'load'});
+  await page.locator('.wx-garden-art img').evaluate(async img=>{await img.decode();if(!img.naturalWidth)throw Error('Garlic missing')});
+  await page.locator('.wx-moon-icon img').evaluate(async img=>{await img.decode();if(!img.naturalWidth)throw Error('Moon missing')});
+  const png=await page.screenshot({type:'png',fullPage:true});
+  if(png.length<10000)throw Error('PNG too small');
+  fs.writeFileSync('dist/'+item.slug+'.png',png);
+  const start=periods[0].begin,end=periods.at(-1).end;
+  if(start!=='00:00'||end!=='24:00')throw Error('Incomplete day '+item.slug);
+  pngChecks.days[item.slug]={date:item.date,ok:true,periods:periods.length,bytes:png.length,start,end,garlic:true,moon:true};
+  await page.close();
+ }
+}finally{await browser.close()}
+fs.writeFileSync('dist/png-validation.json',JSON.stringify(pngChecks,null,2));
+if(!pngChecks.days.today?.ok||!pngChecks.days.tomorrow?.ok)throw Error('Both DTEK day PNG cards required: '+JSON.stringify(pngChecks.days));
 fs.writeFileSync('dist/index.html',html);
 console.log(JSON.stringify({date,live:result.live,periods:result.periods.length,weather:!!result.weather,moon:!!result.moon,error:result.error}));
