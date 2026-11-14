@@ -38,6 +38,13 @@ jobs:
       - name: Install Chromium for DTEK official source
         working-directory: renderer
         run: npx playwright install --with-deps chromium
+      - name: Restore last known weather forecast cache
+        uses: actions/cache/restore@v4
+        with:
+          path: renderer/artifacts/weather-cache.json
+          key: khimik-weather-${{ github.run_id }}
+          restore-keys: |
+            khimik-weather-
       - name: Generate independent live JSON and card (no Telegram tokens)
         working-directory: renderer
         env:
@@ -60,6 +67,12 @@ jobs:
               assert d['periods'][-1]['end']=='24:00'
           print('Test JSON:',d['date'],'live:',d['live'],'periods:',len(d['periods']))
           PY
+      - name: Preserve weather forecast cache for next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: renderer/artifacts/weather-cache.json
+          key: khimik-weather-${{ github.run_id }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
