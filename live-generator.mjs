@@ -88,7 +88,7 @@ function tickLive(){
  if(!data||!data.live||!Array.isArray(data.periods)||data.date!==[kyivParts(new Date()).year,kyivParts(new Date()).month,kyivParts(new Date()).day].join('-')||stale){clockEl.textContent='—:—';if(headingEl)headingEl.textContent='Актуальний графік недоступний';return;}
  const k=kyivParts(new Date());
  const nowMin=Number(k.hour)*60+Number(k.minute)+Number(k.second)/60;
- const toMin=(t)=>{const m=/^(\\d{2}):(\\d{2})$/.exec(t||'');return m?Number(m[1])*60+Number(m[2]):NaN};
+ const toMin=(t)=>{const m=/^([0-9]{2}):([0-9]{2})$/.exec(t||'');return m?Number(m[1])*60+Number(m[2]):NaN};
  const periods=data.periods;
  const next=periods.find((p,i)=>i>0&&toMin(p.begin)>nowMin&&p.power!==periods[i-1].power);
  if(!next){clockEl.textContent='—:—';if(headingEl)headingEl.textContent='До кінця доби змін немає';return;}
