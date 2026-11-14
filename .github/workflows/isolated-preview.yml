@@ -45,6 +45,7 @@ jobs:
           GROUP: '1.1'
         run: |
           cp ../live-generator.mjs ./live-generator.mjs
+          cp ../svitlopuls_etalon_garlic.png ../svitlopuls_etalon_moon.png ./
           node live-generator.mjs
           cp ../verify-live.mjs ./verify-live.mjs
           node verify-live.mjs
